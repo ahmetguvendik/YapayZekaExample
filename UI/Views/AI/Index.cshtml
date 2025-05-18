@@ -1,0 +1,68 @@
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="">
+<head>
+    <meta charset="utf-8" />
+    <title>AI Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+</head>
+<body>
+    <h2>AI Chat</h2>
+
+    <div id="chatWindow" style="border:1px solid #ccc; height:300px; overflow-y:auto; padding:10px; margin-bottom:10px;"></div>
+
+    <input type="text" id="messageInput" style="width:80%; padding:10px;" />
+    <button id="sendButton">Gönder</button>
+
+    <script>
+        const backendUrl = "http://localhost:5298";
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl(backendUrl + "/ai-hub")
+            .withAutomaticReconnect()
+            .build();
+
+        let connectionId = null;
+
+        connection.start().then(() => {
+            console.log("SignalR bağlantısı kuruldu.");
+
+            connection.invoke("GetConnectionId").then(id => {
+                connectionId = id;
+                console.log("ConnectionId:", connectionId);
+            });
+        }).catch(err => console.error(err.toString()));
+
+        connection.on("ReceiveMessage", function (message) {
+            const chatWindow = document.getElementById("chatWindow");
+            chatWindow.innerHTML += `<div><b>AI:</b> ${message}</div>`;
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        });
+
+        document.getElementById("sendButton").addEventListener("click", sendMessage);
+        document.getElementById("messageInput").addEventListener("keypress", function (e) {
+            if (e.key === "Enter") sendMessage();
+        });
+
+        function sendMessage() {
+            const input = document.getElementById("messageInput");
+            if (!input.value.trim() || !connectionId) return;
+
+            const chatWindow = document.getElementById("chatWindow");
+            chatWindow.innerHTML += `<div><b>Sen:</b> ${input.value}</div>`;
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            fetch(backendUrl + "/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: input.value, connectionId: connectionId })
+            });
+
+            input.value = "";
+        }
+    </script>
+</body>
+</html>
